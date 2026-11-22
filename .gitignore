@@ -1,0 +1,91 @@
+Logs & Process Files
+
+logs
+.log
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+Diagnostic reports (https://nodejs.org/api/report.html)
+
+report.[0-9].[0-9].[0-9].[0-9].json
+
+Dependency Directories
+
+node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+
+Build & Dist Artifacts
+
+dist/
+dist-ssr/
+build/
+*.bbl
+*.blg
+
+Local Environment Variables
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.backup
+
+Editor & IDE Configs
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+*.suo
+*.ntvsopt
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+Python & FastAPI Artifacts
+
+pycache/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+PyTorch, Weights & ML Checkpoints
+
+outputs/
+checkpoints/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
+*.h5
+*.ckpt
+adapter_model.safetensors
+adapter_config.json
+wandb/
+.gradio/
+
+Temporary Files
+
+tmp/
+temp/
