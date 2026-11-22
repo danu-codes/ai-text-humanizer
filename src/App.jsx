@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Sparkles,
   ScanSearch,
@@ -59,7 +59,8 @@ export default function App() {
   const [isHumanizingAll, setIsHumanizingAll] = useState(false);
   const [selectedSentenceId, setSelectedSentenceId] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [apiMode, setApiMode] = useState("live");
+  const [apiMode, setApiMode] = useState("demo");
+  const [apiStatusMessage, setApiStatusMessage] = useState("Checking...");
   const [temperature, setTemperature] = useState(0.75);
   const [isEditMode, setIsEditMode] = useState(true);
   const [mobileView, setMobileView] = useState("split");
@@ -67,6 +68,38 @@ export default function App() {
 
   const isTextDirty =
     sentences.length > 0 && rawText.trim() !== analyzedSourceText.trim();
+
+  const checkApiHealth = useCallback(async () => {
+    setApiStatusMessage("Checking...");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/`, {
+        method: "GET",
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      setApiMode("live");
+      setApiStatusMessage("Connected");
+    } catch (err) {
+      clearTimeout(timeoutId);
+      setApiMode("demo");
+      setApiStatusMessage(
+        err?.name === "AbortError" ? "Timed out" : "Offline / Fallback"
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    checkApiHealth();
+  }, [checkApiHealth]);
 
   useEffect(() => {
     if (sentences.length > 0 && selectedSentenceId === null) {
@@ -209,9 +242,10 @@ export default function App() {
       body: JSON.stringify({ text: textToAnalyze }),
     });
 
-    if (!res.ok) throw new Error("Backend offline");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     setApiMode("live");
+    setApiStatusMessage("Connected");
 
     return data.map((item, idx) => ({
       id: item.id ?? idx,
@@ -241,6 +275,7 @@ export default function App() {
       setAnalyzedSourceText(rawText);
     } catch {
       setApiMode("demo");
+      setApiStatusMessage("Offline / Fallback");
       setSentences(runLocalFallbackAnalysis(rawText));
       setAnalyzedSourceText(rawText);
     } finally {
@@ -263,12 +298,14 @@ export default function App() {
         }),
       });
 
-      if (!res.ok) throw new Error("Backend offline");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setApiMode("live");
+      setApiStatusMessage("Connected");
       return data.humanized_text;
     } catch {
       setApiMode("demo");
+      setApiStatusMessage("Offline / Fallback");
       await new Promise((r) => setTimeout(r, 380));
       return localRewriteEngine(sentenceObj.text, selectedTone);
     }
@@ -285,6 +322,7 @@ export default function App() {
         workingSentences = await analyzeTextSource(rawText);
       } catch {
         setApiMode("demo");
+        setApiStatusMessage("Offline / Fallback");
         workingSentences = runLocalFallbackAnalysis(rawText);
       }
       setSentences(workingSentences);
@@ -391,6 +429,7 @@ export default function App() {
             </div>
 
             <button
+              type="button"
               onClick={() => setShowSettings(!showSettings)}
               className="md:hidden p-2 rounded text-[#141413] hover:bg-stone-200 border border-[#E2DFD7]"
               aria-label="Toggle settings"
@@ -410,6 +449,7 @@ export default function App() {
               </span>
               {TONES.map((t) => (
                 <button
+                  type="button"
                   key={t.id}
                   onClick={() => setTone(t.id)}
                   className={`px-2.5 py-1 rounded text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
@@ -441,7 +481,12 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 bg-white border border-[#141413] rounded">
+              <button
+                type="button"
+                onClick={checkApiHealth}
+                title={`Endpoint: ${API_BASE_URL} — Click to re-check connection`}
+                className="flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 bg-white hover:bg-stone-100 border border-[#141413] rounded transition-colors cursor-pointer"
+              >
                 <span
                   className={`w-2 h-2 rounded-full ${
                     apiMode === "live"
@@ -452,7 +497,10 @@ export default function App() {
                 <span className="font-semibold uppercase tracking-wider text-[10px]">
                   {apiMode === "live" ? "API Live" : "Fallback"}
                 </span>
-              </div>
+                <span className="text-[10px] text-[#575550] hidden sm:inline">
+                  ({apiStatusMessage})
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -467,7 +515,7 @@ export default function App() {
             </span>
             <span className="flex items-center gap-1.5 text-[#141413] shrink-0">
               <span className="w-2.5 h-2.5 rounded-xs bg-red-500/30 border border-red-600" />
-              High (&ge;75%)
+              High (greater than or equal to 75%)
             </span>
             <span className="flex items-center gap-1.5 text-[#141413] shrink-0">
               <span className="w-2.5 h-2.5 rounded-xs bg-amber-500/30 border border-amber-500" />
@@ -475,7 +523,7 @@ export default function App() {
             </span>
             <span className="flex items-center gap-1.5 text-[#141413] shrink-0">
               <span className="w-2.5 h-2.5 rounded-xs bg-stone-300 border border-stone-400" />
-              Human (&lt;50%)
+              Human (less than 50%)
             </span>
           </div>
 
@@ -505,6 +553,7 @@ export default function App() {
 
             <div className="flex lg:hidden items-center bg-stone-200/80 p-0.5 rounded border border-[#E2DFD7] shrink-0 ml-auto md:ml-0">
               <button
+                type="button"
                 onClick={() => setMobileView("split")}
                 className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
                   mobileView === "split"
@@ -515,6 +564,7 @@ export default function App() {
                 Split
               </button>
               <button
+                type="button"
                 onClick={() => setMobileView("source")}
                 className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
                   mobileView === "source"
@@ -525,6 +575,7 @@ export default function App() {
                 Source
               </button>
               <button
+                type="button"
                 onClick={() => setMobileView("humanized")}
                 className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
                   mobileView === "humanized"
@@ -562,6 +613,7 @@ export default function App() {
             <div className="flex items-center gap-2 font-mono text-xs">
               {sentences.length > 0 && (
                 <button
+                  type="button"
                   onClick={() => setIsEditMode(!isEditMode)}
                   className="text-[#575550] hover:text-[#141413] underline mr-1 sm:mr-2 text-[11px] sm:text-xs"
                 >
@@ -569,6 +621,7 @@ export default function App() {
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => {
                   setRawText("");
                   setAnalyzedSourceText("");
@@ -617,6 +670,7 @@ export default function App() {
 
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || !rawText.trim()}
                 className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-stone-100 hover:bg-stone-200 text-[#141413] font-semibold border border-[#141413] transition-all disabled:opacity-40 text-xs"
@@ -626,6 +680,7 @@ export default function App() {
               </button>
 
               <button
+                type="button"
                 onClick={handleHumanizeAll}
                 disabled={isHumanizingAll || !rawText.trim()}
                 className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold border border-[#141413] transition-all shadow-[2px_2px_0px_0px_rgba(20,20,19,1)] disabled:opacity-40 text-xs"
@@ -656,6 +711,7 @@ export default function App() {
             </div>
 
             <button
+              type="button"
               onClick={handleCopy}
               disabled={!fullOutputText}
               className="flex items-center gap-1.5 font-mono text-xs px-2.5 sm:px-3 py-1 bg-stone-100 hover:bg-stone-200 border border-[#141413] text-[#141413] transition-colors disabled:opacity-40"
@@ -776,6 +832,7 @@ export default function App() {
                 selectedSentence.humanized_text.trim() !==
                   selectedSentence.text.trim() && (
                   <button
+                    type="button"
                     onClick={() => handleRevertSentence(selectedSentence.id)}
                     className="flex items-center gap-1 px-3 py-2 bg-white hover:bg-stone-100 text-[#141413] border border-[#141413] text-xs font-semibold transition-all"
                     title="Revert this sentence back to original text"
@@ -786,6 +843,7 @@ export default function App() {
                 )}
 
               <button
+                type="button"
                 onClick={() => handleRegenerateSentence(selectedSentence.id)}
                 disabled={selectedSentence.is_regenerating}
                 className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#141413] hover:bg-stone-800 text-[#F6F4EF] font-semibold transition-all shadow-[2px_2px_0px_0px_rgba(29,78,216,1)] disabled:opacity-40 text-xs"
@@ -799,6 +857,7 @@ export default function App() {
               </button>
 
               <button
+                type="button"
                 onClick={() => setSelectedSentenceId(null)}
                 className="p-2 text-[#575550] hover:text-[#141413] hover:bg-stone-200 border border-[#E2DFD7] rounded"
                 aria-label="Close sentence inspector"
