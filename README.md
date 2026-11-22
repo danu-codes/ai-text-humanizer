@@ -135,9 +135,11 @@ Rewrites target text using the fine-tuned Qwen2.5 LoRA adapter.
 ---
 
 ## Live Link
+```json
 
 Live Demo Link: https://ai-text-humanizer-zfy6.onrender.com/
 
+```
 ---
 
 ## License
